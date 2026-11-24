@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10101f">
+  <meta name="description" content="เลือกกระทง เขียนคำอธิษฐาน แล้วชวนเพื่อนมาลอยด้วยกัน">
+  <title>คืนลอยกระทง</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&family=Noto+Serif+Thai:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><canvas id="brand-mark" width="74" height="58" aria-hidden="true"></canvas>คืนลอยกระทง</div>
+    <div class="room-nav">
+      <span id="room-state" class="room-state"><i></i> ลอยคนเดียว</span>
+      <button id="music-button" class="quiet-button" type="button" aria-controls="music-panel" aria-expanded="false"><span aria-hidden="true">♫</span> เพลง</button>
+      <button id="room-button" class="quiet-button" type="button"><span aria-hidden="true">＋</span> ชวนเพื่อน</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="river" aria-label="แม่น้ำสำหรับลอยกระทง">
+      <canvas id="river-lights" aria-hidden="true"></canvas>
+      <div class="river-inner">
+        <div class="intro">
+          <div class="ornament" aria-hidden="true"><span>◇</span></div>
+          <h1>คืนลอยกระทง</h1>
+          <p>อธิษฐานใต้แสงจันทร์<br>แล้วลอยกระทงไปด้วยกัน</p>
+        </div>
+        <div id="floating" class="floating" aria-label="กระทงบนผิวน้ำ"></div>
+        <p id="river-status" class="river-status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+
+    <section class="workbench" aria-labelledby="make-title">
+      <div class="section-heading">
+        <h2 id="make-title">กระทงของคุณ</h2>
+        <span class="tiny-star" aria-hidden="true">✧</span>
+      </div>
+      <form id="wish-form">
+        <fieldset>
+          <legend>เลือกแบบกระทง</legend>
+          <div class="choices">
+            <label class="choice"><input type="radio" name="style" value="gold" checked><canvas width="168" height="120" aria-hidden="true" data-style="gold"></canvas><span>ดาวเรือง</span></label>
+            <label class="choice"><input type="radio" name="style" value="rose"><canvas width="168" height="120" aria-hidden="true" data-style="rose"></canvas><span>บัวชมพู</span></label>
+            <label class="choice"><input type="radio" name="style" value="violet"><canvas width="168" height="120" aria-hidden="true" data-style="violet"></canvas><span>กล้วยไม้</span></label>
+          </div>
+        </fieldset>
+        <label class="field">ชื่อเล่น <span>(ไม่บังคับ)</span>
+          <input id="name" name="name" type="text" maxlength="24" autocomplete="nickname" placeholder="ชื่อที่เพื่อนจะเห็น">
+        </label>
+        <label class="field">คำอธิษฐาน <span>(ไม่บังคับ)</span>
+          <textarea id="wish" name="wish" maxlength="120" rows="2" placeholder="ขอให้ปีนี้…"></textarea>
+        </label>
+        <label class="privacy"><input id="private-wish" type="checkbox" checked> เก็บคำอธิษฐานไว้กับตัวเอง</label>
+        <button id="launch" class="primary-button" type="submit"><span aria-hidden="true">✦</span> ลอยกระทง</button>
+      </form>
+    </section>
+
+    <section class="ledger" aria-labelledby="ledger-title">
+      <div class="ledger-heading"><h2 id="ledger-title">กระทงในสายน้ำ</h2><span id="float-count">0 ใบ</span></div>
+      <p id="empty-ledger">พอลอยกระทงแล้ว กดที่กระทงเพื่อดูรายละเอียดได้</p>
+      <ol id="float-list" class="float-list"></ol>
+    </section>
+
+    <section id="music-panel" class="music-panel" aria-labelledby="music-title" hidden>
+      <div class="section-heading">
+        <h2 id="music-title" tabindex="-1">รอยกระทง (คิดฮอดเจ้าหลาย)</h2>
+        <button id="close-music" class="close-button" type="button" aria-label="ปิดเพลง">×</button>
+      </div>
+      <p>คณะขวัญใจ</p>
+      <div id="music-player"></div>
+      <a href="https://music.youtube.com/watch?v=B3oe2dZfm0M" target="_blank" rel="noopener">เปิดใน YouTube Music</a>
+    </section>
+  </main>
+
+  <dialog id="room-dialog" aria-labelledby="room-title">
+    <div class="modal-heading">
+      <h2 id="room-title">ลอยกับเพื่อน</h2>
+      <form method="dialog"><button class="close-button" aria-label="ปิด" value="close">×</button></form>
+    </div>
+    <p id="room-help">สร้างห้องแล้วส่งลิงก์ให้เพื่อน เปิดห้องไว้ระหว่างเล่น พร้อมกันได้สูงสุด 4 คน</p>
+    <p id="room-notice" class="notice" role="status"></p>
+    <div id="room-lobby">
+      <button id="host-room" class="primary-button" type="button">สร้างห้อง</button>
+      <form id="join-form">
+        <label class="field">รหัสห้อง <input id="join-code" type="text" maxlength="16" autocapitalize="characters" autocomplete="off" spellcheck="false" required placeholder="ใส่รหัสห้องจากเพื่อน"></label>
+        <button class="quiet-button" type="submit">เข้าห้อง</button>
+      </form>
+    </div>
+    <div id="room-share" hidden>
+      <label class="field">ลิงก์เชิญ <input id="invite-link" type="text" readonly></label>
+      <div class="modal-actions">
+        <button id="copy-invite" class="primary-button" type="button">คัดลอกลิงก์</button>
+        <button id="leave-room" class="quiet-button" type="button">ออกจากห้อง</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="wish-dialog" aria-labelledby="wish-title">
+    <div class="modal-heading">
+      <h2 id="wish-title">กระทง</h2>
+      <form method="dialog"><button class="close-button" aria-label="ปิด" value="close">×</button></form>
+    </div>
+    <canvas id="wish-art" width="240" height="156" aria-hidden="true"></canvas>
+    <p id="wish-text"></p>
+  </dialog>
+</body>
+</html>
