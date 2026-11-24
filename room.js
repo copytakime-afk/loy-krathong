@@ -1,9 +1,12 @@
+import { instagramName, readPhoto } from "./profile.js";
+
 export const capacity = 4;
 export const historyLimit = 18;
 export const roomCodePattern = /^[0-9A-F]{12}$/;
 const styles = new Set(["gold", "rose", "violet"]);
 const idPattern = /^[0-9a-f-]{36}$/;
-const prefix = "loy-krathong-v1-";
+const prefix = "loy-krathong-v2-";
+const connectionLabel = "river-v2";
 const timeoutMs = 15000;
 
 export function randomCode() {
@@ -16,7 +19,14 @@ function cleanText(value, limit) {
 
 function readFloat(value) {
   if (!value || typeof value.id !== "string" || !idPattern.test(value.id) || !styles.has(value.style)) return null;
-  return { id: value.id, name: cleanText(value.name, 24), wish: cleanText(value.wish, 120), style: value.style };
+  return {
+    id: value.id,
+    name: cleanText(value.name, 24),
+    wish: cleanText(value.wish, 120),
+    style: value.style,
+    instagram: instagramName(value.instagram),
+    photo: readPhoto(value.photo),
+  };
 }
 
 export class RiverRoom {
@@ -49,7 +59,7 @@ export class RiverRoom {
       this.snapshot();
       return;
     }
-    this.link = this.peer.connect(prefix + this.code, { reliable: true, serialization: "json", label: "river-v1" });
+    this.link = this.peer.connect(prefix + this.code, { reliable: true, serialization: "binary", label: connectionLabel });
     if (!this.link) {
       this.fail("เปิดการเชื่อมต่อไม่ได้ ลองเข้าห้องอีกครั้ง");
       return;
@@ -62,7 +72,7 @@ export class RiverRoom {
   peerError(error) {
     if (!this.active) return;
     if (error.type === "peer-unavailable" && !this.hosting) {
-      this.fail("ไม่พบห้องนี้ ให้เพื่อนเปิดห้องและตรวจรหัสอีกครั้ง");
+      this.fail("ไม่พบห้องนี้ ให้เพื่อนเปิดห้องไว้และลองโหลดหน้าเว็บใหม่");
     } else if (error.type === "unavailable-id" && this.hosting) {
       this.fail("รหัสห้องซ้ำ กดสร้างห้องอีกครั้ง");
     } else if (!this.ready || this.peer.destroyed) {
@@ -71,7 +81,7 @@ export class RiverRoom {
   }
 
   accept(connection) {
-    if (!this.active || !this.hosting || connection.label !== "river-v1") {
+    if (!this.active || !this.hosting || connection.label !== connectionLabel) {
       connection.close();
       return;
     }
@@ -89,7 +99,7 @@ export class RiverRoom {
         return;
       }
       this.guests.add(connection);
-      this.snapshot();
+      this.snapshot({ newcomer: connection });
     });
     connection.on("close", remove);
     connection.on("error", () => {
@@ -98,7 +108,8 @@ export class RiverRoom {
     });
     connection.on("data", data => {
       if (!this.active || !this.guests.has(connection) || data?.type !== "float") return;
-      if (this.add(data.float)) this.snapshot();
+      const added = this.add(data.float);
+      if (added) this.snapshot({ added });
     });
   }
 
@@ -107,7 +118,7 @@ export class RiverRoom {
     if (!float || this.seen.has(float.id)) return false;
     this.seen.add(float.id);
     this.floats = [...this.floats.slice(-(historyLimit - 1)), float];
-    return true;
+    return float;
   }
 
   receive(data) {
@@ -116,27 +127,50 @@ export class RiverRoom {
       this.fail("ห้องนี้เต็มแล้ว (4 คน)");
       return;
     }
+    if (this.ready && data?.type === "photo") {
+      const float = this.floats.find(item => item.id === data.id);
+      const photo = readPhoto(data.photo);
+      if (float && photo && !float.photo) {
+        float.photo = photo;
+        this.update({ floats: this.floats, count: this.count });
+      }
+      return;
+    }
     if (data?.type !== "snapshot" || !Array.isArray(data.floats) || !Number.isInteger(data.count) || data.count < 2 || data.count > capacity) return;
+    const photos = new Map(this.floats.map(float => [float.id, float.photo]));
     const floats = data.floats.slice(-historyLimit).map(readFloat).filter(Boolean);
-    for (const float of floats) this.pending.delete(float.id);
+    for (const float of floats) {
+      float.photo = photos.get(float.id) || "";
+      this.pending.delete(float.id);
+    }
     clearTimeout(this.timer);
+    this.floats = floats;
+    this.count = data.count;
     this.ready = true;
     this.update({ floats, count: data.count });
   }
 
-  snapshot() {
-    const state = { type: "snapshot", floats: this.floats, count: this.guests.size + 1 };
+  snapshot({ added, newcomer } = {}) {
+    const count = this.guests.size + 1;
+    const floats = this.floats.map(({ photo, ...float }) => float);
+    const state = { type: "snapshot", floats, count };
     for (const guest of this.guests) {
-      if (guest.open) guest.send(state);
+      if (!guest.open) continue;
+      guest.send(state);
+      const photoFloats = guest === newcomer ? this.floats : added ? [added] : [];
+      for (const float of photoFloats) {
+        if (float.photo) guest.send({ type: "photo", id: float.id, photo: float.photo });
+      }
     }
-    this.update(state);
+    this.update({ floats: this.floats, count });
   }
 
   launch(float) {
     if (!this.active || !this.ready) return false;
     if (this.hosting) {
-      if (!this.add(float)) return false;
-      this.snapshot();
+      const added = this.add(float);
+      if (!added) return false;
+      this.snapshot({ added });
       return true;
     }
     if (!this.link?.open) return false;

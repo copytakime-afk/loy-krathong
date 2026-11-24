@@ -1,5 +1,6 @@
 import { drawKrathong, startRiverLights, styles } from "./art.js";
-import { capacity, historyLimit, randomCode, RiverRoom, roomCodePattern } from "./room.js";
+import { capacity, historyLimit, randomCode, RiverRoom, roomCodePattern } from "./room.js?v=2";
+import { instagramName, preparePhoto } from "./profile.js";
 
 const byId = id => document.getElementById(id);
 const wishForm = byId("wish-form");
@@ -14,10 +15,16 @@ const wishDialog = byId("wish-dialog");
 const riverStatus = byId("river-status");
 const floatsOnWater = byId("floating");
 const floatList = byId("float-list");
+const profileFields = byId("profile-fields");
+const photoInput = byId("photo-file");
+const photoStatus = byId("photo-status");
+const instagramInput = byId("instagram");
+const instagramError = byId("instagram-error");
 const solo = [];
 const personal = new Map();
 let room, connecting = false, count = 0, waiting = "", riverTimer, peerLoader;
 let visibleFloats = [];
+let draftPhoto = "", photoRequest = 0, preparingPhoto = false, openedFloat = "";
 
 for (const canvas of document.querySelectorAll("canvas[data-style]")) drawKrathong(canvas, canvas.dataset.style);
 drawKrathong(byId("brand-mark"), "gold");
@@ -61,7 +68,7 @@ function roomStatus() {
   byId("room-share").hidden = !live;
   byId("host-room").disabled = connecting;
   byId("join-form").querySelector("button").disabled = connecting;
-  launchButton.disabled = connecting || Boolean(waiting);
+  launchButton.disabled = connecting || Boolean(waiting) || preparingPhoto;
   if (live) {
     const url = new URL(location.href);
     url.searchParams.set("room", room.code);
@@ -76,11 +83,52 @@ function announce(message) {
   riverTimer = setTimeout(() => { riverStatus.textContent = ""; }, 6500);
 }
 
-function showWish(float) {
-  byId("wish-title").textContent = `กระทงของ${float.name || "คนริมฝั่ง"}`;
-  drawKrathong(byId("wish-art"), float.style);
+function photoImage(source, alt) {
+  const image = new Image();
+  image.alt = alt;
+  image.src = source;
+  return image;
+}
+
+function floatOwner(float) {
+  return float.name || (float.instagram ? `@${float.instagram}` : "คนริมฝั่ง");
+}
+
+function renderWish(float) {
+  const owner = floatOwner(float);
+  byId("wish-title").textContent = `กระทงของ${owner}`;
+  const picture = byId("wish-photo");
+  const art = byId("wish-art");
+  picture.hidden = !float.photo;
+  art.hidden = Boolean(float.photo);
+  if (float.photo) {
+    if (picture.firstChild?.src !== float.photo) picture.replaceChildren(photoImage(float.photo, `รูปในกระทงของ${owner}`));
+  } else {
+    picture.replaceChildren();
+    drawKrathong(art, float.style);
+  }
+  const profile = byId("wish-profile");
+  const instagram = byId("wish-instagram");
+  profile.hidden = !float.instagram;
+  if (float.instagram) {
+    instagram.href = `https://www.instagram.com/${float.instagram}/`;
+    instagram.setAttribute("aria-label", `เปิด Instagram ของ @${float.instagram}`);
+    byId("wish-handle").textContent = `@${float.instagram}`;
+  } else {
+    instagram.removeAttribute("href");
+  }
   const ownWish = personal.get(float.id);
-  byId("wish-text").textContent = ownWish ? `${ownWish}\n\nคำอธิษฐานส่วนตัว` : float.wish || "กระทงใบนี้ไม่มีคำอธิษฐานที่เปิดให้ดู";
+  const wishText = byId("wish-text");
+  wishText.textContent = ownWish ? `${ownWish}\n\nคำอธิษฐานส่วนตัว`
+    : float.wish || (float.photo || float.instagram ? "" : "กระทงใบนี้ไม่มีคำอธิษฐานที่เปิดให้ดู");
+  wishText.hidden = !wishText.textContent;
+}
+
+function showWish(id) {
+  const float = visibleFloats.find(item => item.id === id);
+  if (!float) return;
+  openedFloat = id;
+  renderWish(float);
   wishDialog.showModal();
 }
 
@@ -109,8 +157,8 @@ function renderFloats(next, animateNew = true) {
       button.type = "button";
       button.className = animateNew && !previousIds.has(float.id) ? "float-object arriving" : "float-object";
       button.dataset.id = float.id;
-      button.setAttribute("aria-label", `ดูกระทงของ${float.name || "คนริมฝั่ง"}`);
-      button.addEventListener("click", () => showWish(float));
+      button.setAttribute("aria-label", `ดูกระทงของ${floatOwner(float)}`);
+      button.addEventListener("click", () => showWish(float.id));
       const canvas = document.createElement("canvas");
       canvas.width = 220;
       canvas.height = 150;
@@ -118,6 +166,11 @@ function renderFloats(next, animateNew = true) {
       drawKrathong(canvas, float.style);
       button.append(canvas);
       floatsOnWater.append(button);
+    }
+    if (float.photo && !button.querySelector(".float-photo")) {
+      const thumb = photoImage(float.photo, "");
+      thumb.className = "float-photo";
+      button.append(thumb);
     }
   }
   const occupied = new Set();
@@ -142,13 +195,17 @@ function renderFloats(next, animateNew = true) {
       const button = document.createElement("button");
       button.className = "quiet-button";
       button.type = "button";
-      button.textContent = `${float.name || "คนริมฝั่ง"} · ${styles[float.style].label}`;
-      button.addEventListener("click", () => showWish(float));
+      button.textContent = `${floatOwner(float)} · ${styles[float.style].label}`;
+      button.addEventListener("click", () => showWish(float.id));
       item.append(button);
       floatList.append(item);
     }
   }
   visibleFloats = next;
+  if (wishDialog.open) {
+    const float = next.find(item => item.id === openedFloat);
+    if (float) renderWish(float);
+  }
   byId("float-count").textContent = `${next.length} ใบ`;
   byId("empty-ledger").hidden = next.length > 0;
 }
@@ -213,21 +270,89 @@ async function enterRoom(code, hosting) {
 function finishLaunch() {
   waiting = "";
   byId("wish").value = "";
-  launchButton.disabled = false;
+  profileFields.open = false;
+  roomStatus();
   announce("ปล่อยกระทงแล้ว กดที่กระทงบนผิวน้ำเพื่อเปิดดู");
   if (window.innerWidth <= 700) {
     document.querySelector(".river").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
   }
 }
 
+function updateProfileSummary() {
+  const attached = draftPhoto || instagramName(instagramInput.value);
+  byId("profile-summary-state").textContent = attached ? "แนบแล้ว" : "(ไม่บังคับ)";
+}
+
+function previewPhoto() {
+  const preview = byId("preview-photo");
+  preview.replaceChildren(...(draftPhoto ? [photoImage(draftPhoto, "ตัวอย่างรูปบนกระทง")] : []));
+  byId("photo-preview").hidden = !draftPhoto;
+  updateProfileSummary();
+}
+
+photoInput.addEventListener("change", async () => {
+  const file = photoInput.files[0];
+  if (!file) return;
+  const request = ++photoRequest;
+  preparingPhoto = true;
+  photoStatus.textContent = "กำลังเตรียมรูป…";
+  roomStatus();
+  try {
+    const photo = await preparePhoto(file);
+    if (request !== photoRequest) return;
+    draftPhoto = photo;
+    previewPhoto();
+    photoStatus.textContent = "";
+  } catch (error) {
+    if (request !== photoRequest) return;
+    photoInput.value = "";
+    photoStatus.textContent = error.name === "Error" ? error.message : "เปิดรูปไม่ได้ ลองเลือกรูปอื่น";
+  } finally {
+    if (request === photoRequest) {
+      preparingPhoto = false;
+      roomStatus();
+    }
+  }
+});
+byId("remove-photo").addEventListener("click", () => {
+  photoRequest++;
+  draftPhoto = "";
+  preparingPhoto = false;
+  photoInput.value = "";
+  photoStatus.textContent = "";
+  previewPhoto();
+  roomStatus();
+  photoInput.focus();
+});
+instagramInput.addEventListener("input", () => {
+  instagramError.textContent = "";
+  instagramInput.removeAttribute("aria-invalid");
+  updateProfileSummary();
+});
+
 wishForm.addEventListener("submit", event => {
   event.preventDefault();
-  if (connecting || waiting) return;
+  if (connecting || waiting || preparingPhoto) return;
+  const username = instagramName(instagramInput.value);
+  if (instagramInput.value.trim() && !username) {
+    profileFields.open = true;
+    instagramError.textContent = "ใส่ @ชื่อผู้ใช้ หรือลิงก์หน้าโปรไฟล์ Instagram";
+    instagramInput.setAttribute("aria-invalid", "true");
+    instagramInput.focus();
+    return;
+  }
   const fields = new FormData(wishForm);
   const wish = fields.get("wish").trim();
   const isPrivate = byId("private-wish").checked;
   const id = crypto.randomUUID();
-  const float = { id, name: fields.get("name").trim(), wish: isPrivate ? "" : wish, style: fields.get("style") };
+  const float = {
+    id,
+    name: fields.get("name").trim(),
+    wish: isPrivate ? "" : wish,
+    style: fields.get("style"),
+    instagram: username,
+    photo: draftPhoto,
+  };
   if (isPrivate && wish) personal.set(id, wish);
   if (room?.ready) {
     waiting = id;

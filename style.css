@@ -103,6 +103,18 @@ main {
   animation: arrive var(--settle) cubic-bezier(.25,.72,.35,1) both, drift 9s var(--settle) ease-in-out infinite;
 }
 .float-object canvas { position: relative; width: 100%; filter: drop-shadow(0 0 12px #eec06a73); }
+.float-photo {
+  position: absolute;
+  top: 7%;
+  left: 64%;
+  width: clamp(22px, 38%, 43px);
+  aspect-ratio: 1;
+  object-fit: cover;
+  border: 1px solid #f8d49a;
+  border-radius: 50%;
+  background: #20172b;
+  box-shadow: 0 0 9px #f6bc7380;
+}
 .float-object::before, .float-object::after {
   content: "";
   position: absolute;
@@ -187,6 +199,36 @@ legend, .field { font-size: .9rem; font-weight: 500; }
 .field textarea { resize: vertical; }
 .privacy { display: flex; align-items: center; gap: 7px; margin: 0 0 14px; color: var(--muted); font-size: .86rem; cursor: pointer; }
 .privacy input { width: 16px; height: 16px; margin: 0; accent-color: var(--gold); }
+.profile-fields {
+  margin-bottom: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #221e33;
+  padding: 0 9px;
+}
+.profile-fields summary {
+  min-height: 43px;
+  padding-block: 10px;
+  color: var(--gold);
+  cursor: pointer;
+  font-size: .9rem;
+}
+.profile-fields summary span { color: var(--muted); font-size: .8rem; }
+.profile-help, .profile-message { color: var(--muted); font-size: .84rem; margin-bottom: 10px; }
+.profile-message { color: #ffda9f; margin-top: -6px; }
+.profile-message:empty { display: none; }
+.profile-fields input[type="file"] { min-width: 0; padding: 5px; font-size: .82rem; }
+.profile-fields input::file-selector-button {
+  border: 1px solid #aa86665c;
+  border-radius: 5px;
+  padding: 4px 6px;
+  background: #392b41;
+  color: var(--gold);
+  cursor: pointer;
+}
+.photo-preview { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.photo-preview img { display: block; width: 48px; height: 48px; object-fit: cover; border-radius: 6px; }
+.profile-fields input[aria-invalid="true"] { border-color: #e6a48b; }
 
 .ledger { grid-column: 1 / -1; padding: 22px clamp(24px, 8vw, 124px) 29px; border-top: 1px solid #3c3246; background: #151425; }
 .ledger-heading { display: flex; gap: 12px; align-items: baseline; margin-bottom: 6px; }
@@ -227,6 +269,37 @@ dialog::backdrop { background: #0a0916c9; }
 .modal-actions { display: flex; gap: 8px; }
 .modal-actions .quiet-button { flex-shrink: 0; }
 #wish-art { display: block; width: 145px; height: auto; margin-inline: auto; }
+.wish-photo {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  margin: 13px 0 12px;
+  border: 1px solid #a4826a85;
+  border-radius: 9px;
+  background: #100e1f;
+}
+.wish-photo img { display: block; max-width: 100%; max-height: 48dvh; object-fit: contain; }
+.wish-profile { display: flex; justify-content: center; margin: 8px 0 12px; }
+.wish-profile a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 7px 13px;
+  border: 1px solid #b58dd181;
+  border-radius: 7px;
+  background: #332540;
+  color: #f7dfff;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.wish-profile a:hover { background: #4d355c; }
+.instagram-glyph { position: relative; width: 17px; height: 17px; flex: 0 0 17px; border: 1px solid currentColor; border-radius: 5px; }
+.instagram-glyph::before, .instagram-glyph::after { content: ""; position: absolute; border-radius: 50%; }
+.instagram-glyph::before { width: 7px; height: 7px; top: 4px; left: 4px; border: 1px solid currentColor; }
+.instagram-glyph::after { width: 2px; height: 2px; top: 2px; right: 2px; background: currentColor; }
 #wish-text { text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 @media (max-width: 700px) {
